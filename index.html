@@ -1,0 +1,891 @@
+<!DOCTYPE html>
+<html lang="en" class="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Advanced EMI & Prepayment Calculator</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Inter', 'sans-serif'] },
+                    colors: {
+                        brand: { 50: '#eff6ff', 100: '#dbeafe', 500: '#3b82f6', 600: '#2563eb', 700: '#1d4ed8' },
+                        success: { 50: '#f0fdf4', 500: '#22c55e', 600: '#16a34a' },
+                        dark: { bg: '#0f172a', card: '#1e293b', border: '#334155' }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        :root {
+            --range-thumb: #2563eb;
+            --range-track: #dbeafe;
+        }
+        .dark {
+            --range-thumb: #3b82f6;
+            --range-track: #334155;
+        }
+        
+        body { font-family: 'Inter', sans-serif; transition: background-color 0.3s, color 0.3s; }
+        
+        /* Custom Range Slider Styling */
+        input[type=range] {
+            -webkit-appearance: none; width: 100%; background: transparent; height: 6px; border-radius: 4px; outline: none; margin: 12px 0;
+        }
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%; height: 6px; cursor: pointer; background: var(--range-track); border-radius: 4px;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            height: 20px; width: 20px; border-radius: 50%; background: var(--range-thumb); cursor: pointer;
+            -webkit-appearance: none; margin-top: -7px; box-shadow: 0 2px 4px rgba(0,0,0,0.2); transition: transform 0.1s;
+        }
+        input[type=range]::-webkit-slider-thumb:hover { transform: scale(1.1); }
+        input[type=range]:focus::-webkit-slider-thumb { box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.3); }
+        
+        /* Dynamic filling of track */
+        .range-slider-container { position: relative; }
+        .range-progress { position: absolute; top: 12px; left: 0; height: 6px; background-color: var(--range-thumb); border-radius: 4px; pointer-events: none; z-index: 0; }
+        input[type=range] { position: relative; z-index: 1; }
+
+        /* Hide number input spinners */
+        input[type=number]::-webkit-inner-spin-button, input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+        input[type=number] { -moz-appearance: textfield; }
+
+        /* Table styles */
+        .table-row-expanded { background-color: rgba(59, 130, 246, 0.05); }
+        .dark .table-row-expanded { background-color: rgba(59, 130, 246, 0.1); }
+        .prepayment-highlight { background-color: rgba(34, 197, 94, 0.1) !important; }
+        
+        /* Smooth transitions */
+        .card { transition: box-shadow 0.2s, transform 0.2s; }
+        .card:hover { box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1); }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-800 dark:bg-dark-bg dark:text-gray-100 min-h-screen flex flex-col">
+
+    <header class="bg-white dark:bg-dark-card shadow-sm sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <div class="flex items-center gap-2">
+                <svg class="w-8 h-8 text-brand-600 dark:text-brand-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                <h1 class="text-xl font-bold tracking-tight text-gray-900 dark:text-white">Smart EMI Calculator</h1>
+            </div>
+            <button id="themeToggle" class="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors" title="Toggle Theme">
+                <svg id="icon-sun" class="w-5 h-5 hidden text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
+                <svg id="icon-moon" class="w-5 h-5 text-gray-500 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path></svg>
+            </button>
+        </div>
+    </header>
+
+    <main class="flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full grid grid-cols-1 lg:grid-cols-12 gap-8">
+        
+        <div class="lg:col-span-5 space-y-6">
+            
+            <!-- Basic Details Card -->
+            <div class="bg-white dark:bg-dark-card rounded-2xl shadow-sm border border-gray-100 dark:border-dark-border p-6 card">
+                <h2 class="text-lg font-semibold mb-6 flex items-center gap-2">
+                    <svg class="w-5 h-5 text-brand-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path></svg>
+                    Loan Details
+                </h2>
+
+                <!-- Loan Amount -->
+                <div class="mb-6">
+                    <div class="flex justify-between items-end mb-2">
+                        <label class="text-sm font-medium text-gray-600 dark:text-gray-300">Loan Amount</label>
+                        <div class="relative w-32 sm:w-40">
+                            <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-500 font-medium">₹</span>
+                            <input type="text" id="inp-amount-text" class="block w-full pl-8 pr-3 py-1.5 text-right bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-brand-500 dark:bg-gray-800 dark:border-gray-700 font-semibold" value="50,00,000">
+                        </div>
+                    </div>
+                    <div class="range-slider-container">
+                        <div class="range-progress" id="prog-amount"></div>
+                        <input type="range" id="inp-amount" min="100000" max="100000000" step="100000" value="5000000">
+                    </div>
+                    <p id="amt-words" class="text-xs text-brand-600 dark:text-brand-400 mt-1 font-medium">50 Lakh</p>
+                </div>
+
+                <!-- Interest Rate -->
+                <div class="mb-6">
+                    <div class="flex justify-between items-end mb-2">
+                        <label class="text-sm font-medium text-gray-600 dark:text-gray-300">Interest Rate (p.a.)</label>
+                        <div class="relative w-24">
+                            <input type="number" id="inp-rate" class="block w-full pr-8 pl-3 py-1.5 text-right bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-brand-500 dark:bg-gray-800 dark:border-gray-700 font-semibold" min="1" max="30" step="0.05" value="8.5">
+                            <span class="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-500 font-medium">%</span>
+                        </div>
+                    </div>
+                    <div class="range-slider-container">
+                        <div class="range-progress" id="prog-rate"></div>
+                        <input type="range" id="inp-rate-slider" min="1" max="30" step="0.05" value="8.5">
+                    </div>
+                </div>
+
+                <!-- Tenure -->
+                <div class="mb-6">
+                    <div class="flex justify-between items-end mb-2">
+                        <label class="text-sm font-medium text-gray-600 dark:text-gray-300">Loan Tenure</label>
+                        <div class="flex items-center space-x-2">
+                            <input type="number" id="inp-tenure" class="block w-20 px-3 py-1.5 text-right bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-brand-500 dark:bg-gray-800 dark:border-gray-700 font-semibold" min="1" max="30" value="20">
+                            <div class="flex bg-gray-100 dark:bg-gray-800 p-0.5 rounded-lg border border-gray-200 dark:border-gray-700 text-sm">
+                                <button id="btn-yr" class="px-3 py-1 rounded-md bg-white dark:bg-gray-700 shadow-sm font-medium text-brand-600 dark:text-white">Yr</button>
+                                <button id="btn-mo" class="px-3 py-1 rounded-md text-gray-500 dark:text-gray-400 font-medium hover:text-gray-700">Mo</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="range-slider-container">
+                        <div class="range-progress" id="prog-tenure"></div>
+                        <input type="range" id="inp-tenure-slider" min="1" max="30" step="1" value="20">
+                    </div>
+                </div>
+
+                <!-- Start Date & Rounding -->
+                <div class="grid grid-cols-2 gap-4 mb-4">
+                    <div>
+                        <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Start Month</label>
+                        <div class="flex gap-2">
+                            <select id="inp-start-month" class="block w-full py-1.5 px-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-brand-500 dark:bg-gray-800 dark:border-gray-700"></select>
+                            <select id="inp-start-year" class="block w-full py-1.5 px-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-brand-500 dark:bg-gray-800 dark:border-gray-700"></select>
+                        </div>
+                    </div>
+                    <div class="flex items-center justify-end pt-5">
+                        <label class="flex items-center cursor-pointer">
+                            <div class="relative">
+                                <input type="checkbox" id="inp-round" class="sr-only" checked>
+                                <div class="block bg-gray-200 dark:bg-gray-700 w-10 h-6 rounded-full transition-colors toggle-bg"></div>
+                                <div class="dot absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition transform toggle-dot"></div>
+                            </div>
+                            <div class="ml-3 text-xs font-medium text-gray-600 dark:text-gray-300">Round EMI to ₹100</div>
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white dark:bg-dark-card rounded-2xl shadow-sm border border-gray-100 dark:border-dark-border p-6 card">
+                <h2 class="text-lg font-semibold mb-4 flex items-center gap-2">
+                    <svg class="w-5 h-5 text-success-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                    Prepayment Options
+                </h2>
+
+                <!-- Prepayment Effect Toggle -->
+                <div class="mb-5 bg-gray-50 dark:bg-gray-800 p-1 rounded-lg flex text-sm text-center">
+                    <button id="btn-effect-tenure" class="flex-1 py-2 px-3 rounded-md bg-white dark:bg-gray-700 shadow-sm font-medium text-brand-600 dark:text-white transition-all">Reduce Tenure</button>
+                    <button id="btn-effect-emi" class="flex-1 py-2 px-3 rounded-md text-gray-500 dark:text-gray-400 font-medium hover:text-gray-700 transition-all">Reduce EMI</button>
+                </div>
+
+                <!-- Accordions for Prepayment Types -->
+                <div class="space-y-4">
+                    
+                    <!-- Recurring Prepayment -->
+                    <div class="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
+                        <button class="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800/50 flex justify-between items-center text-sm font-medium hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors" onclick="toggleAccordion('recurring-panel', this)">
+                            <span>Recurring Extra Payment</span>
+                            <svg class="w-4 h-4 transform transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                        </button>
+                        <div id="recurring-panel" class="hidden p-4 space-y-4 bg-white dark:bg-dark-card">
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-xs font-medium text-gray-500 mb-1">Frequency</label>
+                                    <select id="rec-freq" class="w-full py-1.5 px-2 bg-gray-50 border border-gray-200 rounded-lg text-sm dark:bg-gray-800 dark:border-gray-700">
+                                        <option value="1">Monthly</option>
+                                        <option value="3">Quarterly</option>
+                                        <option value="6">Half-Yearly</option>
+                                        <option value="12" selected>Yearly</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-medium text-gray-500 mb-1">Amount (₹)</label>
+                                    <input type="number" id="rec-amt" class="w-full py-1.5 px-3 bg-gray-50 border border-gray-200 rounded-lg text-sm dark:bg-gray-800 dark:border-gray-700" placeholder="e.g. 50000" min="0">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Lump Sum Prepayment -->
+                    <div class="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
+                        <button class="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800/50 flex justify-between items-center text-sm font-medium hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors" onclick="toggleAccordion('lump-panel', this)">
+                            <span>One-time Lump Sums</span>
+                            <svg class="w-4 h-4 transform transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                        </button>
+                        <div id="lump-panel" class="hidden p-4 bg-white dark:bg-dark-card">
+                            <div id="lumpsum-container" class="space-y-3 mb-3">
+                                <!-- Dynamic rows go here -->
+                            </div>
+                            <button onclick="addLumpSumRow()" class="text-sm text-brand-600 dark:text-brand-400 font-medium flex items-center hover:underline">
+                                <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
+                                Add Lump Sum
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <div class="lg:col-span-7 space-y-6">
+            
+            <!-- Summary Cards Grid -->
+            <div class="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                <!-- Base EMI -->
+                <div class="bg-white dark:bg-dark-card p-4 rounded-xl shadow-sm border border-gray-100 dark:border-dark-border card">
+                    <p class="text-xs text-gray-500 dark:text-gray-400 font-medium mb-1">Monthly EMI</p>
+                    <p class="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white" id="res-emi">₹0</p>
+                    <p class="text-[10px] text-gray-400 mt-1" id="res-emi-note"></p>
+                </div>
+                <!-- Interest Saved -->
+                <div class="bg-gradient-to-br from-success-50 to-white dark:from-success-600/20 dark:to-dark-card p-4 rounded-xl shadow-sm border border-success-100 dark:border-success-600/30 card">
+                    <p class="text-xs text-success-600 dark:text-success-400 font-medium mb-1">Interest Saved</p>
+                    <p class="text-xl sm:text-2xl font-bold text-success-600 dark:text-success-400" id="res-saved">₹0</p>
+                </div>
+                <!-- Tenure Reduced -->
+                <div class="bg-white dark:bg-dark-card p-4 rounded-xl shadow-sm border border-gray-100 dark:border-dark-border card col-span-2 sm:col-span-1">
+                    <p class="text-xs text-gray-500 dark:text-gray-400 font-medium mb-1">Time Saved</p>
+                    <p class="text-xl sm:text-lg font-bold text-gray-900 dark:text-white leading-tight mt-1" id="res-time-saved">0 Months</p>
+                </div>
+            </div>
+
+            <!-- Detailed Summary Box -->
+            <div class="bg-white dark:bg-dark-card p-5 rounded-xl shadow-sm border border-gray-100 dark:border-dark-border flex flex-col sm:flex-row justify-between divide-y sm:divide-y-0 sm:divide-x divide-gray-200 dark:divide-gray-700 text-sm">
+                <div class="pb-3 sm:pb-0 sm:pr-4 flex-1">
+                    <p class="text-gray-500 dark:text-gray-400 mb-2">Total Interest Payable</p>
+                    <div class="flex justify-between font-medium">
+                        <span class="text-gray-400 line-through mr-2" id="res-base-int">₹0</span>
+                        <span class="text-gray-900 dark:text-white" id="res-new-int">₹0</span>
+                    </div>
+                </div>
+                <div class="py-3 sm:py-0 sm:px-4 flex-1">
+                    <p class="text-gray-500 dark:text-gray-400 mb-2">Total Amount Payable</p>
+                    <div class="flex justify-between font-medium">
+                        <span class="text-gray-400 line-through mr-2" id="res-base-total">₹0</span>
+                        <span class="text-gray-900 dark:text-white" id="res-new-total">₹0</span>
+                    </div>
+                </div>
+                <div class="pt-3 sm:pt-0 sm:pl-4 flex-1">
+                    <p class="text-gray-500 dark:text-gray-400 mb-2">Loan End Date</p>
+                    <div class="flex justify-between font-medium">
+                        <span class="text-gray-400 line-through mr-2" id="res-base-end">-</span>
+                        <span class="text-gray-900 dark:text-white" id="res-new-end">-</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white dark:bg-dark-card p-5 rounded-xl shadow-sm border border-gray-100 dark:border-dark-border">
+                <div class="flex flex-col sm:flex-row justify-between items-center mb-6">
+                    <h3 class="font-semibold text-gray-800 dark:text-gray-100">Visual Analysis</h3>
+                    <div class="flex space-x-2 mt-2 sm:mt-0 text-xs">
+                        <button class="chart-tab active-tab px-3 py-1 rounded-full bg-brand-50 text-brand-600 dark:bg-brand-600/20 dark:text-brand-400 font-medium" onclick="switchChart('balance')">Balance</button>
+                        <button class="chart-tab px-3 py-1 rounded-full text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 font-medium" onclick="switchChart('breakdown')">Breakdown</button>
+                        <button class="chart-tab px-3 py-1 rounded-full text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 font-medium" onclick="switchChart('yearly')">Yearly</button>
+                    </div>
+                </div>
+                
+                <div class="relative w-full h-64 sm:h-80">
+                    <canvas id="mainChart"></canvas>
+                </div>
+            </div>
+
+            <div class="bg-white dark:bg-dark-card rounded-xl shadow-sm border border-gray-100 dark:border-dark-border overflow-hidden">
+                <div class="p-5 border-b border-gray-100 dark:border-gray-700 flex justify-between items-center">
+                    <h3 class="font-semibold text-gray-800 dark:text-gray-100">Amortization Schedule</h3>
+                    <button onclick="downloadCSV()" class="text-sm flex items-center text-brand-600 dark:text-brand-400 hover:underline">
+                        <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                        Export CSV
+                    </button>
+                </div>
+                <div class="overflow-x-auto max-h-96">
+                    <table class="w-full text-sm text-left">
+                        <thead class="text-xs text-gray-500 uppercase bg-gray-50 dark:bg-gray-800/50 sticky top-0 z-10">
+                            <tr>
+                                <th class="px-4 py-3">Year</th>
+                                <th class="px-4 py-3 text-right">Principal</th>
+                                <th class="px-4 py-3 text-right">Interest</th>
+                                <th class="px-4 py-3 text-right text-success-600">Prepayment</th>
+                                <th class="px-4 py-3 text-right">Balance</th>
+                            </tr>
+                        </thead>
+                        <tbody id="table-body" class="divide-y divide-gray-100 dark:divide-gray-700">
+                            <!-- Populated via JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            
+            <p class="text-xs text-center text-gray-400 mt-4 pb-4">Indicative calculation only. Actual EMI and schedules may vary by bank policy.</p>
+        </div>
+    </main>
+
+    <style>
+        input:checked ~ .toggle-bg { background-color: #3b82f6; }
+        input:checked ~ .dot { transform: translateX(100%); }
+        .dark input:checked ~ .toggle-bg { background-color: #2563eb; }
+    </style>
+
+    <script>
+        // Constants & Config
+        const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+        let chartInstance = null;
+        let activeChartType = 'balance';
+        
+        // App State
+        let state = {
+            amount: 5000000,
+            rate: 8.5,
+            tenure: 20,
+            isYears: true,
+            startMonth: new Date().getMonth(),
+            startYear: new Date().getFullYear(),
+            roundEmi: true,
+            prepaymentEffect: 'reduce_tenure', // or 'reduce_emi'
+            recurring: { active: false, freq: 12, amount: 0 },
+            lumpSums: [], // { id, month, year, amount }
+            // Results memory
+            baseSchedule: [], newSchedule: [],
+            baseTotalInt: 0, newTotalInt: 0
+        };
+
+        // DOM Elements mapping
+        const els = {
+            amtTxt: document.getElementById('inp-amount-text'),
+            amtRng: document.getElementById('inp-amount'),
+            amtWrds: document.getElementById('amt-words'),
+            rateTxt: document.getElementById('inp-rate'),
+            rateRng: document.getElementById('inp-rate-slider'),
+            tenureTxt: document.getElementById('inp-tenure'),
+            tenureRng: document.getElementById('inp-tenure-slider'),
+            btnYr: document.getElementById('btn-yr'),
+            btnMo: document.getElementById('btn-mo'),
+            startMo: document.getElementById('inp-start-month'),
+            startYr: document.getElementById('inp-start-year'),
+            roundEmi: document.getElementById('inp-round'),
+            
+            btnEffTenure: document.getElementById('btn-effect-tenure'),
+            btnEffEmi: document.getElementById('btn-effect-emi'),
+            
+            recFreq: document.getElementById('rec-freq'),
+            recAmt: document.getElementById('rec-amt'),
+            lumpContainer: document.getElementById('lumpsum-container'),
+            
+            // Results
+            resEmi: document.getElementById('res-emi'),
+            resEmiNote: document.getElementById('res-emi-note'),
+            resSaved: document.getElementById('res-saved'),
+            resTimeSaved: document.getElementById('res-time-saved'),
+            resBaseInt: document.getElementById('res-base-int'),
+            resNewInt: document.getElementById('res-new-int'),
+            resBaseTotal: document.getElementById('res-base-total'),
+            resNewTotal: document.getElementById('res-new-total'),
+            resBaseEnd: document.getElementById('res-base-end'),
+            resNewEnd: document.getElementById('res-new-end'),
+            
+            tableBody: document.getElementById('table-body')
+        };
+
+        function init() {
+            populateDates();
+            setupThemeToggle();
+            bindEvents();
+            syncAllInputs();
+            addLumpSumRow(); // Start with one empty row
+            calculate();
+        }
+
+        const formatINR = (val) => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(Math.round(val));
+        const formatNum = (val) => new Intl.NumberFormat('en-IN').format(val);
+        const parseINR = (str) => parseFloat(str.replace(/[^0-9.]/g, '')) || 0;
+
+        function numberToWords(val) {
+            if(val >= 10000000) return (val/10000000).toFixed(2).replace(/\.00$/, '') + ' Crore';
+            if(val >= 100000) return (val/100000).toFixed(2).replace(/\.00$/, '') + ' Lakh';
+            return formatNum(val);
+        }
+
+        function populateDates() {
+            MONTHS.forEach((m, i) => {
+                let opt = new Option(m, i);
+                if(i === state.startMonth) opt.selected = true;
+                els.startMo.add(opt);
+            });
+            let currentYear = new Date().getFullYear();
+            for(let i = 0; i < 10; i++) {
+                let opt = new Option(currentYear + i, currentYear + i);
+                els.startYr.add(opt);
+            }
+            els.startYr.value = state.startYear;
+        }
+
+        // Accordion Toggle
+        function toggleAccordion(id, btn) {
+            const panel = document.getElementById(id);
+            const icon = btn.querySelector('svg');
+            panel.classList.toggle('hidden');
+            if(panel.classList.contains('hidden')) {
+                icon.style.transform = 'rotate(0deg)';
+                if(id === 'recurring-panel') els.recAmt.value = ''; // Reset on close
+            } else {
+                icon.style.transform = 'rotate(180deg)';
+            }
+            triggerCalc();
+        }
+
+        function bindEvents() {
+            // Amount
+            els.amtTxt.addEventListener('blur', (e) => {
+                let val = parseINR(e.target.value);
+                if(val < 100000) val = 100000;
+                if(val > 100000000) val = 100000000;
+                state.amount = val;
+                syncAllInputs(); triggerCalc();
+            });
+            els.amtTxt.addEventListener('focus', (e) => e.target.value = state.amount); // Show raw number on focus
+            els.amtRng.addEventListener('input', (e) => { state.amount = parseInt(e.target.value); syncAllInputs(); triggerCalc(); });
+            
+            // Rate
+            els.rateTxt.addEventListener('input', (e) => { state.rate = parseFloat(e.target.value)||0; syncSliders(); triggerCalc(); });
+            els.rateRng.addEventListener('input', (e) => { state.rate = parseFloat(e.target.value); syncAllInputs(); triggerCalc(); });
+            
+            // Tenure
+            els.tenureTxt.addEventListener('input', (e) => { state.tenure = parseInt(e.target.value)||0; syncSliders(); triggerCalc(); });
+            els.tenureRng.addEventListener('input', (e) => { state.tenure = parseInt(e.target.value); syncAllInputs(); triggerCalc(); });
+            
+            els.btnYr.addEventListener('click', () => { setTenureType(true); });
+            els.btnMo.addEventListener('click', () => { setTenureType(false); });
+
+            // Others
+            els.startMo.addEventListener('change', (e) => { state.startMonth = parseInt(e.target.value); triggerCalc(); });
+            els.startYr.addEventListener('change', (e) => { state.startYear = parseInt(e.target.value); triggerCalc(); });
+            els.roundEmi.addEventListener('change', (e) => { state.roundEmi = e.target.checked; triggerCalc(); });
+
+            // Prepayment Effects
+            els.btnEffTenure.addEventListener('click', () => { setPrepayEffect('reduce_tenure'); });
+            els.btnEffEmi.addEventListener('click', () => { setPrepayEffect('reduce_emi'); });
+
+            // Recurring
+            els.recFreq.addEventListener('change', triggerCalc);
+            els.recAmt.addEventListener('input', triggerCalc);
+        }
+
+        function setTenureType(isYears) {
+            state.isYears = isYears;
+            els.btnYr.className = isYears ? "px-3 py-1 rounded-md bg-white dark:bg-gray-700 shadow-sm font-medium text-brand-600 dark:text-white" : "px-3 py-1 rounded-md text-gray-500 dark:text-gray-400 font-medium hover:text-gray-700";
+            els.btnMo.className = !isYears ? "px-3 py-1 rounded-md bg-white dark:bg-gray-700 shadow-sm font-medium text-brand-600 dark:text-white" : "px-3 py-1 rounded-md text-gray-500 dark:text-gray-400 font-medium hover:text-gray-700";
+            
+            els.tenureRng.max = isYears ? 30 : 360;
+            els.tenureTxt.max = isYears ? 30 : 360;
+            // Convert value safely
+            if(isYears) state.tenure = Math.max(1, Math.floor(state.tenure / 12));
+            else state.tenure = state.tenure * 12;
+            syncAllInputs();
+            triggerCalc();
+        }
+
+        function setPrepayEffect(effect) {
+            state.prepaymentEffect = effect;
+            const activeCls = "flex-1 py-2 px-3 rounded-md bg-white dark:bg-gray-700 shadow-sm font-medium text-brand-600 dark:text-white transition-all";
+            const inactiveCls = "flex-1 py-2 px-3 rounded-md text-gray-500 dark:text-gray-400 font-medium hover:text-gray-700 transition-all";
+            els.btnEffTenure.className = effect === 'reduce_tenure' ? activeCls : inactiveCls;
+            els.btnEffEmi.className = effect === 'reduce_emi' ? activeCls : inactiveCls;
+            triggerCalc();
+        }
+
+        function syncAllInputs() {
+            els.amtTxt.value = formatNum(state.amount);
+            els.amtRng.value = state.amount;
+            els.amtWrds.innerText = numberToWords(state.amount);
+            
+            els.rateTxt.value = state.rate;
+            els.rateRng.value = state.rate;
+            
+            els.tenureTxt.value = state.tenure;
+            els.tenureRng.value = state.tenure;
+            
+            updateProgress('prog-amount', els.amtRng);
+            updateProgress('prog-rate', els.rateRng);
+            updateProgress('prog-tenure', els.tenureRng);
+        }
+
+        function syncSliders() {
+            els.amtRng.value = state.amount;
+            els.rateRng.value = state.rate;
+            els.tenureRng.value = state.tenure;
+            updateProgress('prog-amount', els.amtRng);
+            updateProgress('prog-rate', els.rateRng);
+            updateProgress('prog-tenure', els.tenureRng);
+        }
+
+        function updateProgress(id, el) {
+            const min = parseFloat(el.min); const max = parseFloat(el.max); const val = parseFloat(el.value);
+            const percent = ((val - min) / (max - min)) * 100;
+            document.getElementById(id).style.width = percent + '%';
+        }
+
+        function addLumpSumRow() {
+            const id = 'lump-' + Date.now() + Math.floor(Math.random()*100);
+            const row = document.createElement('div');
+            row.className = 'flex gap-2 items-center';
+            row.id = id;
+            
+            let moOpts = MONTHS.map((m, i) => `<option value="${i}">${m}</option>`).join('');
+            let yrOpts = '';
+            for(let i=0; i<31; i++) yrOpts += `<option value="${state.startYear + i}">${state.startYear + i}</option>`;
+            
+            row.innerHTML = `
+                <select class="lump-mo py-1.5 px-2 bg-gray-50 border border-gray-200 rounded-lg text-sm flex-1 dark:bg-gray-800 dark:border-gray-700">${moOpts}</select>
+                <select class="lump-yr py-1.5 px-2 bg-gray-50 border border-gray-200 rounded-lg text-sm flex-1 dark:bg-gray-800 dark:border-gray-700">${yrOpts}</select>
+                <input type="number" class="lump-amt py-1.5 px-3 bg-gray-50 border border-gray-200 rounded-lg text-sm w-24 sm:w-32 dark:bg-gray-800 dark:border-gray-700" placeholder="Amount">
+                <button onclick="removeLumpSumRow('${id}')" class="p-1.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg" title="Remove">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                </button>
+            `;
+            els.lumpContainer.appendChild(row);
+            
+            // Add listeners
+            row.querySelectorAll('select, input').forEach(el => el.addEventListener('input', triggerCalc));
+        }
+
+        function removeLumpSumRow(id) {
+            document.getElementById(id).remove();
+            triggerCalc();
+        }
+
+        // Debounce calculation slightly to keep UI smooth during slider drag
+        let calcTimeout;
+        function triggerCalc() {
+            clearTimeout(calcTimeout);
+            calcTimeout = setTimeout(calculate, 20);
+        }
+
+        function calculate() {
+            const amount = state.amount;
+            const rate = state.rate;
+            const totalMonths = state.isYears ? state.tenure * 12 : state.tenure;
+            if(amount <= 0 || rate <= 0 || totalMonths <= 0) return;
+
+            const rateMonthly = (rate / 100) / 12;
+            
+            // Calc Base EMI
+            let exactEmi = amount * rateMonthly * Math.pow(1+rateMonthly, totalMonths) / (Math.pow(1+rateMonthly, totalMonths) - 1);
+            let baseEmi = state.roundEmi ? Math.round(exactEmi / 100) * 100 : exactEmi;
+
+            // Gather Prepayments
+            let recAmount = parseFloat(els.recAmt.value) || 0;
+            let recFreq = parseInt(els.recFreq.value) || 12; // months interval
+            let lumps = [];
+            document.querySelectorAll('#lumpsum-container > div').forEach(row => {
+                let mo = parseInt(row.querySelector('.lump-mo').value);
+                let yr = parseInt(row.querySelector('.lump-yr').value);
+                let amt = parseFloat(row.querySelector('.lump-amt').value) || 0;
+                if(amt > 0) lumps.push({ month: mo, year: yr, amount: amt });
+            });
+
+            // Run Scenarios
+            const baseResult = generateSchedule(amount, baseEmi, rateMonthly, totalMonths, false, 0, 0, []);
+            const prepResult = generateSchedule(amount, baseEmi, rateMonthly, totalMonths, true, recAmount, recFreq, lumps);
+
+            state.baseSchedule = baseResult.schedule;
+            state.newSchedule = prepResult.schedule;
+            state.baseTotalInt = baseResult.totalInt;
+            state.newTotalInt = prepResult.totalInt;
+
+            updateUI(baseEmi, baseResult, prepResult);
+        }
+
+        function generateSchedule(P, emi, r, n, isPrepayment, recAmt, recFreq, lumps) {
+            let schedule = [];
+            let balance = P;
+            let totalInt = 0;
+            let totalPre = 0;
+            let mCount = 0;
+            let cMo = state.startMonth;
+            let cYr = state.startYear;
+            let currentEmi = emi;
+
+            while(balance > 0.5 && mCount < 1200) { // Safety max 100 yrs
+                mCount++;
+                let interest = balance * r;
+                let principal = currentEmi - interest;
+                let prepay = 0;
+
+                // Adjust for final month
+                if (balance + interest <= currentEmi) {
+                    currentEmi = balance + interest;
+                    principal = balance;
+                }
+
+                if (isPrepayment) {
+                    // Check Recurring
+                    if (recAmt > 0 && mCount % recFreq === 0) prepay += recAmt;
+                    
+                    // Check Lump Sums
+                    lumps.forEach(l => { if(l.month === cMo && l.year === cYr) prepay += l.amount; });
+
+                    // Cap prepayment to remaining balance
+                    if (prepay > balance - principal) prepay = Math.max(0, balance - principal);
+                }
+
+                balance = balance - principal - prepay;
+                if (balance < 0) balance = 0;
+                
+                totalInt += interest;
+                totalPre += prepay;
+
+                schedule.push({ moIndex: mCount, month: cMo, year: cYr, emi: currentEmi, principal, interest, prepay, balance });
+
+                // Reduce EMI Logic
+                if (isPrepayment && prepay > 0 && state.prepaymentEffect === 'reduce_emi' && balance > 0) {
+                    let remMonths = n - mCount;
+                    if(remMonths > 0) {
+                        let exact = balance * r * Math.pow(1+r, remMonths) / (Math.pow(1+r, remMonths) - 1);
+                        currentEmi = state.roundEmi ? Math.round(exact / 100) * 100 : exact;
+                    }
+                }
+
+                // Advance Date
+                cMo++;
+                if(cMo > 11) { cMo = 0; cYr++; }
+            }
+
+            return { schedule, totalInt, totalPre, endMo: cMo===0 ? 11 : cMo-1, endYr: cMo===0 ? cYr-1 : cYr, count: mCount };
+        }
+
+        function updateUI(baseEmi, base, prep) {
+            // Summary Cards
+            els.resEmi.innerText = formatINR(baseEmi);
+            els.resEmiNote.innerText = state.roundEmi ? "Rounded to nearest ₹100" : "Exact calculation";
+
+            let saved = base.totalInt - prep.totalInt;
+            els.resSaved.innerText = formatINR(Math.max(0, saved));
+            
+            let timeSaved = base.count - prep.count;
+            if (timeSaved > 0) {
+                let y = Math.floor(timeSaved/12); let m = timeSaved % 12;
+                els.resTimeSaved.innerText = `${y > 0 ? y + ' Yrs ' : ''}${m} Mos`;
+                els.resTimeSaved.classList.remove('text-gray-900', 'dark:text-white');
+                els.resTimeSaved.classList.add('text-success-600', 'dark:text-success-400');
+            } else {
+                els.resTimeSaved.innerText = "0 Months";
+                els.resTimeSaved.classList.add('text-gray-900', 'dark:text-white');
+                els.resTimeSaved.classList.remove('text-success-600', 'dark:text-success-400');
+            }
+
+            // Detailed Table
+            els.resBaseInt.innerText = formatINR(base.totalInt);
+            els.resNewInt.innerText = formatINR(prep.totalInt);
+            els.resBaseTotal.innerText = formatINR(state.amount + base.totalInt);
+            els.resNewTotal.innerText = formatINR(state.amount + prep.totalInt);
+            
+            els.resBaseEnd.innerText = `${MONTHS[base.endMo]} ${base.endYr}`;
+            els.resNewEnd.innerText = `${MONTHS[prep.endMo]} ${prep.endYr}`;
+
+            renderTable(prep.schedule);
+            renderCharts();
+        }
+
+        function switchChart(type) {
+            activeChartType = type;
+            document.querySelectorAll('.chart-tab').forEach(el => {
+                el.classList.remove('active-tab', 'bg-brand-50', 'text-brand-600', 'dark:bg-brand-600/20', 'dark:text-brand-400');
+                el.classList.add('text-gray-500');
+            });
+            event.target.classList.add('active-tab', 'bg-brand-50', 'text-brand-600', 'dark:bg-brand-600/20', 'dark:text-brand-400');
+            event.target.classList.remove('text-gray-500');
+            renderCharts();
+        }
+
+        function renderCharts() {
+            if (chartInstance) chartInstance.destroy();
+            const ctx = document.getElementById('mainChart').getContext('2d');
+            const isDark = document.documentElement.classList.contains('dark');
+            const textColor = isDark ? '#94a3b8' : '#64748b';
+            const gridColor = isDark ? '#334155' : '#e2e8f0';
+
+            Chart.defaults.color = textColor;
+            Chart.defaults.font.family = 'Inter';
+
+            let config = {};
+
+            if (activeChartType === 'balance') {
+                // Line Chart: Balance over time
+                let labels = [];
+                let baseData = [];
+                let newData = [];
+                let maxLen = Math.max(state.baseSchedule.length, state.newSchedule.length);
+                
+                // Aggregate yearly for performance/readability on chart
+                for(let i=0; i<maxLen; i+=12) {
+                    let b = state.baseSchedule[i];
+                    let n = state.newSchedule[i];
+                    if(b) { labels.push(`${MONTHS[b.month]} ${b.year}`); baseData.push(b.balance); }
+                    else if(n) { labels.push(`${MONTHS[n.month]} ${n.year}`); } // Keep labels going
+                    if(n) newData.push(n.balance); else newData.push(0);
+                }
+                // Add exact last point if not added
+                let lastB = state.baseSchedule[state.baseSchedule.length-1];
+                labels.push(`${MONTHS[lastB.month]} ${lastB.year}`);
+                baseData.push(0); newData.push(0);
+
+                config = {
+                    type: 'line',
+                    data: {
+                        labels: labels,
+                        datasets: [
+                            { label: 'Without Prepayment', data: baseData, borderColor: '#94a3b8', borderDash: [5, 5], tension: 0.3, pointRadius: 0 },
+                            { label: 'With Prepayment', data: newData, borderColor: '#3b82f6', backgroundColor: 'rgba(59, 130, 246, 0.1)', fill: true, tension: 0.3, pointRadius: 0 }
+                        ]
+                    },
+                    options: {
+                        responsive: true, maintainAspectRatio: false,
+                        interaction: { intersect: false, mode: 'index' },
+                        plugins: { tooltip: { callbacks: { label: (ctx) => ctx.dataset.label + ': ' + formatINR(ctx.raw) } } },
+                        scales: { x: { grid: { display: false } }, y: { grid: { color: gridColor }, ticks: { callback: (val) => '₹' + (val/100000) + 'L' } } }
+                    }
+                };
+            } 
+            else if (activeChartType === 'breakdown') {
+                // Donut: Principal vs Interest (With Prepayment)
+                config = {
+                    type: 'doughnut',
+                    data: {
+                        labels: ['Principal', 'Interest'],
+                        datasets: [{ data: [state.amount, state.newTotalInt], backgroundColor: ['#3b82f6', '#f59e0b'], borderWidth: 0, hoverOffset: 4 }]
+                    },
+                    options: { responsive: true, maintainAspectRatio: false, cutout: '70%', plugins: { tooltip: { callbacks: { label: (ctx) => ctx.label + ': ' + formatINR(ctx.raw) } } } }
+                };
+            }
+            else if (activeChartType === 'yearly') {
+                // Stacked Bar: Yearly Principal vs Interest
+                let years = {};
+                state.newSchedule.forEach(s => {
+                    if(!years[s.year]) years[s.year] = { p:0, i:0 };
+                    years[s.year].p += s.principal + s.prepay;
+                    years[s.year].i += s.interest;
+                });
+                let labels = Object.keys(years);
+                let pData = labels.map(y => years[y].p);
+                let iData = labels.map(y => years[y].i);
+
+                config = {
+                    type: 'bar',
+                    data: { labels: labels, datasets: [ { label: 'Principal Paid', data: pData, backgroundColor: '#3b82f6' }, { label: 'Interest Paid', data: iData, backgroundColor: '#f59e0b' } ] },
+                    options: {
+                        responsive: true, maintainAspectRatio: false,
+                        scales: { x: { stacked: true, grid: { display: false } }, y: { stacked: true, grid: { color: gridColor }, ticks: { callback: (val) => '₹' + (val/100000) + 'L' } } },
+                        plugins: { tooltip: { callbacks: { label: (ctx) => ctx.dataset.label + ': ' + formatINR(ctx.raw) } } }
+                    }
+                };
+            }
+
+            chartInstance = new Chart(ctx, config);
+        }
+
+        function renderTable(schedule) {
+            let html = '';
+            let currentYear = -1;
+            let yearData = { p:0, i:0, pre:0, bal:0, rows:[] };
+            
+            schedule.forEach((s, idx) => {
+                if(s.year !== currentYear) {
+                    if(currentYear !== -1) html += generateYearRow(currentYear, yearData);
+                    currentYear = s.year;
+                    yearData = { p:0, i:0, pre:0, bal:0, rows:[] };
+                }
+                yearData.p += s.principal;
+                yearData.i += s.interest;
+                yearData.pre += s.prepay;
+                yearData.bal = s.balance; // End of year balance
+                yearData.rows.push(s);
+                
+                // Handle last row
+                if(idx === schedule.length - 1) html += generateYearRow(currentYear, yearData);
+            });
+            els.tableBody.innerHTML = html;
+        }
+
+        function generateYearRow(year, data) {
+            const hasPrepay = data.pre > 0;
+            let rowsHtml = data.rows.map(r => `
+                <tr class="hidden group-rows-${year} text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-800/30 ${r.prepay>0 ? 'prepayment-highlight' : ''}">
+                    <td class="px-4 py-2 pl-8">${MONTHS[r.month]}</td>
+                    <td class="px-4 py-2 text-right">${formatINR(r.principal)}</td>
+                    <td class="px-4 py-2 text-right">${formatINR(r.interest)}</td>
+                    <td class="px-4 py-2 text-right ${r.prepay>0 ? 'text-success-600 font-medium' : ''}">${r.prepay > 0 ? formatINR(r.prepay) : '-'}</td>
+                    <td class="px-4 py-2 text-right">${formatINR(r.balance)}</td>
+                </tr>
+            `).join('');
+
+            return `
+                <tr class="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors border-t border-gray-100 dark:border-gray-700" onclick="toggleYearRows('${year}')">
+                    <td class="px-4 py-3 font-medium flex items-center">
+                        <svg class="w-4 h-4 mr-2 text-gray-400 transform transition-transform" id="icon-${year}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+                        ${year}
+                    </td>
+                    <td class="px-4 py-3 text-right font-medium">${formatINR(data.p)}</td>
+                    <td class="px-4 py-3 text-right font-medium">${formatINR(data.i)}</td>
+                    <td class="px-4 py-3 text-right font-medium ${hasPrepay ? 'text-success-600' : ''}">${hasPrepay ? formatINR(data.pre) : '-'}</td>
+                    <td class="px-4 py-3 text-right font-medium">${formatINR(data.bal)}</td>
+                </tr>
+                ${rowsHtml}
+            `;
+        }
+
+        window.toggleYearRows = function(year) {
+            const rows = document.querySelectorAll(`.group-rows-${year}`);
+            const icon = document.getElementById(`icon-${year}`);
+            let isHidden = rows[0].classList.contains('hidden');
+            rows.forEach(r => r.classList.toggle('hidden'));
+            icon.style.transform = isHidden ? 'rotate(90deg)' : 'rotate(0deg)';
+        };
+
+        window.downloadCSV = function() {
+            let csv = "Year,Month,EMI Paid,Principal Paid,Interest Paid,Prepayment,Outstanding Balance\n";
+            state.newSchedule.forEach(s => {
+                csv += `${s.year},${MONTHS[s.month]},${Math.round(s.emi)},${Math.round(s.principal)},${Math.round(s.interest)},${Math.round(s.prepay)},${Math.round(s.balance)}\n`;
+            });
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement("a");
+            const url = URL.createObjectURL(blob);
+            link.setAttribute("href", url);
+            link.setAttribute("download", "Amortization_Schedule.csv");
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        function setupThemeToggle() {
+            const toggle = document.getElementById('themeToggle');
+            const sun = document.getElementById('icon-sun');
+            const moon = document.getElementById('icon-moon');
+            const html = document.documentElement;
+
+            // Check system preference or default to light (no localStorage as requested)
+            let isDark = false; 
+            
+            const updateUI = () => {
+                if (isDark) {
+                    html.classList.add('dark');
+                    sun.classList.remove('hidden'); moon.classList.add('hidden');
+                } else {
+                    html.classList.remove('dark');
+                    sun.classList.add('hidden'); moon.classList.remove('hidden');
+                }
+                if(chartInstance) renderCharts(); // Re-render for colors
+            };
+
+            toggle.addEventListener('click', () => {
+                isDark = !isDark;
+                updateUI();
+            });
+            
+            updateUI();
+        }
+
+        // Boot
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>
